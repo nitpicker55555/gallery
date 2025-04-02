@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>图片浏览器</title>
+    <title>Gallery</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         :root {
@@ -112,8 +112,12 @@
             visibility: hidden;
             transition: opacity 0.5s ease;
             padding: 0 1.5rem 2rem 1.5rem;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
         }
-
+        .masonry-container::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
         .masonry-container.active {
             opacity: 1;
             visibility: visible;
@@ -182,7 +186,7 @@
             z-index: 1001;
             margin: 15px auto 30px auto;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            border-radius: 25px;
+            border-radius: 16px;
             /* 移除CSS过渡属性，使用JavaScript控制动画 */
         }
 
@@ -368,7 +372,7 @@
 </head>
 <body>
 <div class="container">
-    <h1 class="fade-in-up">图片浏览器</h1>
+    <h1 class="fade-in-up">Gallery</h1>
     <div id="loader" class="loader fade-in-up delay-1">
         <div class="loader-dot"></div>
         <div class="loader-dot"></div>
