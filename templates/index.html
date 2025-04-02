@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片浏览器</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #333;
+            --secondary-color: #666;
+            --accent-color: #4a90e2;
+            --bg-color: #f5f5f7;
+            --card-color: #fff;
+            --transition-speed: 0.4s;
+            --easing: cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--primary-color);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-align: center;
+        }
+
+        .folders-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 2rem;
+        }
+
+        .folder-card {
+            background-color: var(--card-color);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            transition: transform var(--transition-speed) var(--easing),
+            box-shadow var(--transition-speed) ease;
+            cursor: pointer;
+        }
+
+        .folder-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .folder-preview {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            aspect-ratio: 1/1;
+            overflow: hidden;
+        }
+
+        .folder-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .folder-preview img:hover {
+            transform: scale(1.05);
+        }
+
+        .folder-info {
+            padding: 1.5rem;
+        }
+
+        .folder-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            color: var(--primary-color);
+        }
+
+        .folder-count {
+            font-size: 0.9rem;
+            color: var(--secondary-color);
+        }
+
+        .masonry-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: var(--bg-color);
+            z-index: 1000;
+            overflow: auto;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.5s ease;
+            padding: 0 1.5rem 2rem 1.5rem;
+        }
+
+        .masonry-container.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .masonry-grid {
+            column-gap: 1.5rem; /* 增加列间距 */
+            column-width: 250px; /* 使用列宽而不是列数 */
+            margin: 0 auto;
+            width: 100%;
+
+        }
+
+        .masonry-item {
+            break-inside: avoid; /* 防止项目被分割到不同列 */
+            margin-bottom: 1.5rem; /* 增加上下间距 */
+            border-radius: 12px; /* 增加圆角 */
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.8) translateY(50px);
+            transition: opacity 0.5s ease, transform 0.5s var(--easing);
+            cursor: zoom-in;
+            position: relative;
+            width: 100%;
+            display: inline-block; /* 防止空白间隙 */
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08); /* 添加轻微阴影 */
+        }
+
+        .masonry-item img {
+            display: block;
+            width: 100%;
+            height: auto;
+            transition: transform 0.3s ease;
+            border-radius: 12px; /* 图片也添加圆角 */
+        }
+
+        .masonry-item.animate {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+
+        .masonry-item img {
+            display: block;
+            width: 100%;
+            height: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .masonry-item:hover img {
+            transform: scale(1.03);
+        }
+
+        /* 毛玻璃导航栏 */
+        .folder-nav {
+            position: sticky;
+            top: 15px;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            background-color: rgba(129, 129, 129, 0.5);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            padding: 0 1.5rem;
+            z-index: 1001;
+            margin: 15px auto 30px auto;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            border-radius: 25px;
+            /* 移除CSS过渡属性，使用JavaScript控制动画 */
+        }
+
+        .folder-title {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin: 0;
+            flex-grow: 1;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-back {
+            background-color: rgba(255, 255, 255, 0.15); /* 半透明白色背景 */
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            backdrop-filter: blur(10px); /* 毛玻璃感更明显 */
+            -webkit-backdrop-filter: blur(10px); /* 兼容 Safari */
+            box-shadow: 8px 8px 24px rgba(0, 0, 0, 0.2); /* 右下方向阴影 */
+        }
+
+
+        .nav-back:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: translateX(-3px);
+        }
+
+        .lightbox {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.4s ease, backdrop-filter 0.4s ease, background-color 0.4s ease;
+        }
+
+        .lightbox.active {
+            opacity: 1;
+            visibility: visible;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+
+        .lightbox-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform-origin: center;
+            cursor: grab;
+        }
+
+        .lightbox-content:active {
+            cursor: grabbing;
+        }
+
+        .lightbox-img {
+            max-width: 100%;
+            max-height: 90vh;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background-color: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 2001;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+
+        .lightbox-close:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+
+        /* 加载动画 */
+        .loader {
+            display: flex;
+            justify-content: center;
+            margin: 2rem 0;
+        }
+
+        .loader-dot {
+            width: 12px;
+            height: 12px;
+            margin: 0 5px;
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            animation: loader 1.2s ease-in-out infinite;
+        }
+
+        .loader-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loader-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes loader {
+            0%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            50% {
+                opacity: 1;
+                transform: translateY(-10px);
+            }
+        }
+
+        /* 动画相关 */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .fade-in-up {
+            animation: fadeInUp 0.5s var(--easing) forwards;
+        }
+
+        .delay-1 {
+            animation-delay: 0.1s;
+        }
+
+        .delay-2 {
+            animation-delay: 0.2s;
+        }
+
+        .delay-3 {
+            animation-delay: 0.3s;
+        }
+
+        /* 没有数据的提示 */
+        .no-data {
+            text-align: center;
+            padding: 2rem;
+            color: var(--secondary-color);
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1 class="fade-in-up">图片浏览器</h1>
+    <div id="loader" class="loader fade-in-up delay-1">
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+        <div class="loader-dot"></div>
+    </div>
+    <div id="folders-grid" class="folders-grid"></div>
+    <div id="no-data" class="no-data" style="display: none;">暂无文件夹数据</div>
+</div>
+
+<!-- 瀑布流容器 -->
+<div id="masonry-container" class="masonry-container">
+    <div id="folder-nav" class="folder-nav">
+        <button id="nav-back" class="nav-back">
+            <i class="fas fa-arrow-left"></i>
+        </button>
+        <h2 id="folder-title" class="folder-title">文件夹名称</h2>
+    </div>
+    <div id="masonry-grid" class="masonry-grid"></div>
+</div>
+
+<!-- 灯箱 -->
+<div id="lightbox" class="lightbox">
+    <div class="lightbox-content">
+        <img id="lightbox-img" class="lightbox-img" src="" alt="">
+    </div>
+    <button id="lightbox-close" class="lightbox-close">
+        <i class="fas fa-times"></i>
+    </button>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const foldersGrid = document.getElementById('folders-grid');
+        const loader = document.getElementById('loader');
+        const noData = document.getElementById('no-data');
+        const masonryContainer = document.getElementById('masonry-container');
+        const masonryGrid = document.getElementById('masonry-grid');
+        const navBack = document.getElementById('nav-back');
+        const folderTitle = document.getElementById('folder-title');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxImg = document.getElementById('lightbox-img');
+        const lightboxClose = document.getElementById('lightbox-close');
+
+        let currentScale = 1;
+        let currentFolder = null;
+
+        // 获取文件夹数据
+        function fetchFolders() {
+            fetch('/api/folders')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('获取文件夹数据失败');
+                    }
+                    return response.json();
+                })
+                .then(folders => {
+                    loader.style.display = 'none';
+
+                    if (folders.length === 0) {
+                        noData.style.display = 'block';
+                        return;
+                    }
+
+                    renderFolders(folders);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    loader.style.display = 'none';
+                    noData.textContent = '获取数据失败，请稍后重试';
+                    noData.style.display = 'block';
+                });
+        }
+
+        // 渲染文件夹列表
+        function renderFolders(folders) {
+            foldersGrid.innerHTML = '';
+
+            folders.forEach((folder, index) => {
+                const folderCard = document.createElement('div');
+                folderCard.className = `folder-card`;
+                // 初始隐藏状态，准备动画
+                folderCard.style.opacity = '0';
+                folderCard.style.transform = 'translateY(30px)';
+
+                let previewHTML = '';
+
+                // 创建预览网格
+                if (folder.images.length > 0) {
+                    const previewImages = folder.images.slice(0, 4);
+                    previewHTML = `
+                            <div class="folder-preview">
+                                ${previewImages.map((img, i) => `
+                                    <img src="${img.url}" alt="${img.name}" loading="lazy">
+                                `).join('')}
+                                ${Array(4 - previewImages.length).fill().map(() => `
+                                    <div style="background-color: #f0f0f0;"></div>
+                                `).join('')}
+                            </div>
+                        `;
+                } else {
+                    previewHTML = `
+                            <div class="folder-preview">
+                                <div style="background-color: #f0f0f0; grid-column: span 2; grid-row: span 2;"></div>
+                            </div>
+                        `;
+                }
+
+                folderCard.innerHTML = `
+                        ${previewHTML}
+                        <div class="folder-info">
+                            <div class="folder-name">${folder.name}</div>
+                            <div class="folder-count">${folder.count} 张图片</div>
+                        </div>
+                    `;
+
+                // 添加点击事件
+                folderCard.addEventListener('click', () => {
+                    openMasonryView(folder);
+                });
+
+                foldersGrid.appendChild(folderCard);
+
+                // 错开动画入场
+                setTimeout(() => {
+                    folderCard.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                    folderCard.style.opacity = '1';
+                    folderCard.style.transform = 'translateY(0)';
+                }, 50 * index);
+            });
+        }
+
+        // 打开瀑布流视图
+        function openMasonryView(folder) {
+            currentFolder = folder;
+
+            // 隐藏主页相册卡片 (渐隐效果)
+            const folderCards = document.querySelectorAll('.folder-card');
+            folderCards.forEach(card => {
+                card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(20px)';
+            });
+
+            // 短暂延迟后显示瀑布流
+            setTimeout(() => {
+                // 设置文件夹标题
+                folderTitle.textContent = folder.name;
+
+                // 清空并重建图片网格
+                masonryGrid.innerHTML = '';
+
+                // 创建所有瀑布流项目
+                folder.images.forEach((image) => {
+                    const masonryItem = document.createElement('div');
+                    masonryItem.className = 'masonry-item';
+                    masonryItem.innerHTML = `<img src="${image.url}" alt="${image.name}" loading="lazy">`;
+
+                    // 添加点击事件，打开灯箱
+                    masonryItem.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        openLightbox(image.url, image.name);
+                    });
+
+                    masonryGrid.appendChild(masonryItem);
+                });
+
+                // 显示容器
+                masonryContainer.classList.add('active');
+                document.body.style.overflow = 'hidden';
+
+                // 显式地将导航栏动画下来
+                const folderNav = document.querySelector('.folder-nav');
+                // 确保先将导航栏重置到顶部位置
+                folderNav.style.transition = 'none';
+                folderNav.style.transform = 'translateY(-100px)';
+
+                // 强制重排以确保浏览器应用新样式
+                folderNav.offsetHeight;
+
+                // 添加过渡效果并动画下拉
+                folderNav.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                folderNav.style.transform = 'translateY(0)';
+
+                // 一起添加动画类，实现同步动画
+                setTimeout(() => {
+                    document.querySelectorAll('.masonry-item').forEach(item => {
+                        item.classList.add('animate');
+                    });
+                }, 100);
+            }, 300);
+        }
+
+        // 关闭瀑布流视图（带动画）
+        function closeMasonryView() {
+            // 先触发收起动画
+            document.querySelectorAll('.masonry-item').forEach(item => {
+                item.classList.remove('animate');
+                item.classList.add('animate-out');
+            });
+
+            // 导航栏弹回动画
+            const folderNav = document.querySelector('.folder-nav');
+            folderNav.style.transform = 'translateY(-100px)';
+
+            // 等待动画完成后再隐藏容器，但不销毁内容
+            setTimeout(() => {
+                // 只隐藏容器，不重置内容
+                masonryContainer.classList.remove('active');
+                document.body.style.overflow = '';
+
+                // 移除动画类，准备下次使用
+                setTimeout(() => {
+                    const items = document.querySelectorAll('.masonry-item');
+                    items.forEach(item => {
+                        item.classList.remove('animate-out');
+                    });
+
+                    // 在主页相册显示动画
+                    const folderCards = document.querySelectorAll('.folder-card');
+                    folderCards.forEach((card, index) => {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateY(30px)';
+
+                        setTimeout(() => {
+                            card.style.transition = 'opacity 0.5s ease, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                            card.style.opacity = '1';
+                            card.style.transform = 'translateY(0)';
+                        }, 50 * index);
+                    });
+                }, 100);
+            }, 500);
+        }
+
+        // 打开灯箱
+        function openLightbox(src, alt) {
+            lightboxImg.src = src;
+            lightboxImg.alt = alt;
+            lightbox.classList.add('active');
+
+            // 重置缩放和位置
+            currentScale = 1;
+            translateX = 0;
+            translateY = 0;
+
+            // 初始动画 - 从小到大展开
+            lightboxImg.style.transform = 'scale(0.8)';
+            lightboxImg.style.opacity = '0';
+            lightboxImg.style.transition = 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease';
+
+            // 确保过渡效果应用后再设置最终状态
+            setTimeout(() => {
+                lightboxImg.style.transform = 'scale(1)';
+                lightboxImg.style.opacity = '1';
+
+                // 动画完成后移除过渡效果以便拖动不受影响
+                setTimeout(() => {
+                    lightboxImg.style.transition = '';
+                }, 500);
+            }, 50);
+        }
+
+        // 关闭灯箱（带动画）
+        function closeLightbox() {
+            // 应用退出动画 - 与背景模糊动画时长一致
+            lightboxImg.style.transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease';
+            lightboxImg.style.transform = 'scale(0.8)';
+            lightboxImg.style.opacity = '0';
+
+            // 移除active类，开始背景模糊渐变动画
+            lightbox.classList.remove('active');
+
+            // 等待动画完成后重置状态
+            setTimeout(() => {
+                // 重置状态以备下次使用
+                currentScale = 1;
+                translateX = 0;
+                translateY = 0;
+
+                // 动画完成后移除过渡效果以便下次拖动不受影响
+                lightboxImg.style.transition = '';
+            }, 400);
+        }
+
+        // 缩放功能 - 非线性动画
+        function handleWheel(e) {
+            if (!lightbox.classList.contains('active')) return;
+
+            e.preventDefault();
+
+            // 非线性缩放 - 缩放速度随着当前缩放比例变化
+            const scaleSpeed = 0.15 / (Math.abs(currentScale - 1) + 0.5);
+            const delta = e.deltaY > 0 ? -scaleSpeed : scaleSpeed;
+
+            // 阻尼效果 - 当缩放接近最大/最小值时变得更困难
+            const targetScale = currentScale + delta;
+            const maxScale = 5;
+            const minScale = 0.5;
+
+            if (targetScale > maxScale) {
+                currentScale = maxScale - (maxScale - targetScale) * 0.3;
+            } else if (targetScale < minScale) {
+                currentScale = minScale + (targetScale - minScale) * 0.3;
+            } else {
+                currentScale = targetScale;
+            }
+
+            // 确保缩放在合理范围内
+            currentScale = Math.max(0.3, Math.min(6, currentScale));
+
+            // 应用带有缓动效果的缩放
+            lightboxImg.style.transition = 'transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            lightboxImg.style.transform = `scale(${currentScale})`;
+
+            // 短暂后移除过渡效果以便拖动不受影响
+            setTimeout(() => {
+                lightboxImg.style.transition = '';
+            }, 250);
+        }
+
+        // 拖拽功能
+        let isDragging = false;
+        let startX, startY;
+        let translateX = 0, translateY = 0;
+
+        function startDrag(e) {
+            if (!lightbox.classList.contains('active')) return;
+
+            // 鼠标点击或触摸事件
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+
+            isDragging = true;
+            startX = clientX - translateX;
+            startY = clientY - translateY;
+
+            lightboxImg.style.transition = '';
+
+            // 更改鼠标样式
+            document.documentElement.style.cursor = 'grabbing';
+        }
+
+        function drag(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+
+            // 鼠标移动或触摸移动事件
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+
+            translateX = clientX - startX;
+            translateY = clientY - startY;
+
+            // 应用缩放和平移变换
+            lightboxImg.style.transform = `scale(${currentScale}) translate(${translateX / currentScale}px, ${translateY / currentScale}px)`;
+        }
+
+        function endDrag() {
+            isDragging = false;
+            document.documentElement.style.cursor = '';
+        }
+
+        // 重置图片位置
+        function resetImagePosition() {
+            translateX = 0;
+            translateY = 0;
+
+            // 应用缩放并重置位置
+            lightboxImg.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            lightboxImg.style.transform = `scale(${currentScale})`;
+
+            setTimeout(() => {
+                lightboxImg.style.transition = '';
+            }, 300);
+        }
+
+        // 双击重置缩放
+        function handleDoubleClick() {
+            if (!lightbox.classList.contains('active')) return;
+
+            if (currentScale !== 1 || translateX !== 0 || translateY !== 0) {
+                // 重置到原始状态
+                currentScale = 1;
+                resetImagePosition();
+            } else {
+                // 放大到适中的大小
+                currentScale = 2;
+                lightboxImg.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                lightboxImg.style.transform = `scale(${currentScale})`;
+
+                setTimeout(() => {
+                    lightboxImg.style.transition = '';
+                }, 300);
+            }
+        }
+
+        // 事件监听
+        navBack.addEventListener('click', closeMasonryView);
+        lightboxClose.addEventListener('click', closeLightbox);
+        lightbox.addEventListener('click', (e) => {
+            if (e.target === lightbox) {
+                closeLightbox();
+            }
+        });
+
+        // 滚轮缩放
+        window.addEventListener('wheel', handleWheel, { passive: false });
+
+        // 拖拽事件
+        lightboxImg.addEventListener('mousedown', startDrag);
+        lightboxImg.addEventListener('touchstart', startDrag);
+        window.addEventListener('mousemove', drag);
+        window.addEventListener('touchmove', drag, { passive: false });
+        window.addEventListener('mouseup', endDrag);
+        window.addEventListener('touchend', endDrag);
+
+        // 双击事件
+        lightboxImg.addEventListener('dblclick', handleDoubleClick);
+
+        // 初始加载
+        fetchFolders();
+    });
+</script>
+</body>
+</html>
